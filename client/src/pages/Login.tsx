@@ -95,8 +95,9 @@ const Login = () => {
         console.error('Failed to verify OTP:', data.error);
       } else {
         setAuth(data.data);
+        //setAuth(response);
         console.log('OTP verified successfully');
-        //navigate('/dashboard', { replace: true });
+        navigate('/dashboard');
         //window.location.href = '/dashboard';
       }
     } catch (error) {

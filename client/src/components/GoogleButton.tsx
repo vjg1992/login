@@ -8,9 +8,6 @@ const GoogleButton: React.FC = () => {
       console.error('API URL not configured');
       return;
     }
-
-    console.log('Starting Google OAuth flow...');
-    console.log('API URL:', apiUrl);
     
     // Direct link to Google auth endpoint
     const googleAuthUrl = `${apiUrl}/api/auth/google`;
