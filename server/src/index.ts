@@ -1,6 +1,9 @@
+// server/src/index.ts
 import express from 'express';
 import cors from 'cors';
 import { config } from 'dotenv';
+import authRoutes from './routes/auth.routes';
+import cookieParser from 'cookie-parser';
 
 // Load environment variables
 config();
@@ -13,8 +16,12 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(cookieParser());
 
-// Basic route for testing
+// Routes
+app.use('/api/auth', authRoutes);
+
+// Health check route
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
