@@ -31,4 +31,13 @@ router.get('/google/test-config', (req, res) => {
     res.json(config);
 });
 
+router.get('/google/config', (req, res) => {
+    const config = {
+        clientIdLength: process.env.GOOGLE_CLIENT_ID?.length || 0,
+        redirectUri: 'http://localhost:5000/api/auth/google/callback',
+        clientUrl: process.env.CLIENT_URL,
+    };
+    res.json(config);
+});
+
 export default router;

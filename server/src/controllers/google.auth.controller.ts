@@ -17,6 +17,14 @@ if (!googleClientId || !googleClientSecret || !googleCallbackUrl) {
     throw new Error('Missing required Google OAuth environment variables');
 }
 
+// Log environment variables for debugging
+console.log('Environment variables check:');
+console.log('CLIENT_ID exists:', !!process.env.GOOGLE_CLIENT_ID);
+console.log('CLIENT_SECRET exists:', !!process.env.GOOGLE_CLIENT_SECRET);
+console.log('CALLBACK_URL:', process.env.GOOGLE_CALLBACK_URL);
+
+const REDIRECT_URI = 'http://localhost:5000/api/auth/google/callback';
+
 const client = new OAuth2Client({
     clientId: googleClientId,
     clientSecret: googleClientSecret,
@@ -31,7 +39,9 @@ export const googleLogin = (req: Request, res: Response) => {
             scope: [
                 'https://www.googleapis.com/auth/userinfo.profile',
                 'https://www.googleapis.com/auth/userinfo.email'
-            ]
+            ],
+            prompt: 'consent',
+            redirect_uri: REDIRECT_URI
         });
         console.log('Redirecting to Google auth URL:', authUrl);
         res.redirect(authUrl);

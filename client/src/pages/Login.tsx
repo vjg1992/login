@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { authService } from '../services/auth.service';
 import { ApiError } from '../types/auth.types';
 import './Login.css';
+import GoogleButton from '@/components/GoogleButton';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -85,9 +86,11 @@ const Login = () => {
     }
   };
 
-  const handleGoogleLogin = () => {
-    window.location.href = `${import.meta.env.VITE_API_URL}/auth/google`;
-  };
+  // const handleGoogleLogin = () => {
+  //   console.log('Starting Google login...');
+  //   console.log(`http://localhost:5000/api/auth/google/callback`);
+  //   window.location.href = `http://localhost:5000/api/auth/google/callback`;
+  // };
 
   return (
     <div className="login-container">
@@ -236,15 +239,10 @@ const Login = () => {
               )}
             </form>
           )}
-
+          {/* Google Login Button */}
           <div className="divider">OR</div>
 
-          <button 
-            onClick={handleGoogleLogin}
-            className="google-button"
-          >
-            Continue with Google
-          </button>
+          <GoogleButton />
 
           <p className="register-link">
             Don't have an account? <Link to="/register">Register here</Link>
