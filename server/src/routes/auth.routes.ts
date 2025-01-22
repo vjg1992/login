@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { validateRegistration } from '../middleware/auth';
 import * as authController from '../controllers/auth.controller';
 import * as googleController from '../controllers/google.controller';
+import * as googleAuthController from '../controllers/google.auth.controller';
 
 const router = Router();
 
@@ -12,7 +13,22 @@ router.post('/send-otp', authController.sendOTP as (req: Request, res: Response)
 router.post('/verify-otp', authController.verifyOTP as (req: Request, res: Response) => void);
 
 // Google OAuth routes
-router.get('/google', (req, res) => googleController.googleAuth(req, res));
-router.get('/google/callback', (req, res) => googleController.googleCallback(req, res));
+//router.get('/google', (req, res) => googleController.googleAuth(req, res));
+//router.get('/google/callback', (req, res) => googleController.googleCallback(req, res));
+
+router.get('/google', (req, res) => googleAuthController.googleLogin(req, res));
+router.get('/google/callback', (req, res) => googleAuthController.googleCallback(req, res));
+
+// Test route to check Google OAuth configuration
+router.get('/google/test-config', (req, res) => {
+    const config = {
+        clientIdExists: !!process.env.GOOGLE_CLIENT_ID,
+        clientSecretExists: !!process.env.GOOGLE_CLIENT_SECRET,
+        callbackUrlExists: !!process.env.GOOGLE_CALLBACK_URL,
+        clientUrl: process.env.CLIENT_URL,
+        callbackUrl: process.env.GOOGLE_CALLBACK_URL
+    };
+    res.json(config);
+});
 
 export default router;
