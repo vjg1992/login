@@ -13,9 +13,6 @@ router.post('/send-otp', authController.sendOTP as (req: Request, res: Response)
 router.post('/verify-otp', authController.verifyOTP as (req: Request, res: Response) => void);
 
 // Google OAuth routes
-//router.get('/google', (req, res) => googleController.googleAuth(req, res));
-//router.get('/google/callback', (req, res) => googleController.googleCallback(req, res));
-
 router.get('/google', (req, res) => googleAuthController.googleLogin(req, res));
 router.get('/google/callback', (req, res) => googleAuthController.googleCallback(req, res));
 

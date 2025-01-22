@@ -26,6 +26,7 @@ export const authenticateToken = (
   try {
     const decoded = verifyToken(token);
     req.userId = decoded.userId;
+    console.log('req.userId:', req.userId);
     next();
   } catch (error) {
     res.status(403).json({ error: 'Invalid token' });

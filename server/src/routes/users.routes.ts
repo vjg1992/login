@@ -13,7 +13,11 @@ router.get('/test', (req, res) => {
 // Get all users (protected route)
 router.get('/', authenticateToken, usersController.getAllUsers as any);
 
+// Get current user's profile (protected route)
+router.get('/profile', authenticateToken, usersController.getUserDetails);
+
 // Get user by ID (protected route)
 router.get('/:id', authenticateToken, usersController.getUserById as any);
+
 
 export default router;
