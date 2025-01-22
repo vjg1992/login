@@ -6,6 +6,9 @@ config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'jwtsecret';
 
+// Test if JWT_SECRET is properly set
+console.log('JWT_SECRET is', JWT_SECRET ? 'set' : 'not set');
+
 export const generateToken = (userId: string): string => {
   return jwt.sign({ userId }, JWT_SECRET, {
     expiresIn: '30d', // Token expires in 30 days
