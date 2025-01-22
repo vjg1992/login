@@ -27,6 +27,18 @@ const Login = () => {
     otpSent: false
   });
 
+  const resetOTPForm = () => {
+    setOtpForm({
+      emailOrMobile: '',
+      otp: '',
+      otpSent: false
+    });
+  };
+
+  const handleTabClick = (tab: string) => {
+    setActiveTab(tab);
+    resetOTPForm();
+  };
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -65,32 +77,34 @@ const Login = () => {
 
   const handleOTPVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
-
     try {
-      const type = activeTab === 'emailOtp' ? 'email' : 'mobile';
-      const response = await authService.verifyOTP(
-        type,
-        otpForm.emailOrMobile,
-        otpForm.otp
-      );
-      if (response.verified) {
-        navigate('/dashboard');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: activeTab === 'emailOtp' ? 'email' : 'mobile',
+          value: otpForm.emailOrMobile,
+          otp: otpForm.otp
+        })
+      });
+  
+      const data = await response.json();
+      if (!data) {
+        setError(data.error || 'Verification failed');
+        console.error('Failed to verify OTP:', data.error);
+      } else {
+        setAuth(data.data);
+        console.log('OTP verified successfully');
+        //navigate('/dashboard', { replace: true });
+        //window.location.href = '/dashboard';
       }
-    } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.response?.data?.error || 'Invalid OTP');
+    } catch (error) {
+      console.error('Failed to verify OTP:', error);
     } finally {
       setLoading(false);
     }
   };
-
-  // const handleGoogleLogin = () => {
-  //   console.log('Starting Google login...');
-  //   console.log(`http://localhost:5000/api/auth/google/callback`);
-  //   window.location.href = `http://localhost:5000/api/auth/google/callback`;
-  // };
 
   return (
     <div className="login-container">
@@ -102,7 +116,7 @@ const Login = () => {
         <div className="login-tabs">
           <button 
             className={`tab-button ${activeTab === 'password' ? 'active' : ''}`}
-            onClick={() => setActiveTab('password')}
+            onClick={() => handleTabClick('password')}
           >
             Password
           </button>

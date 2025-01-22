@@ -27,15 +27,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const setAuth = (auth: AuthResponse | null) => {
-    if (auth) {
-      setUser(auth.user);
-      setToken(auth.token);
-      localStorage.setItem('auth_token', auth.token);
-    } else {
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('auth_token');
+  const setAuth = (authData: AuthResponse | null) => {
+    if (authData && authData.token) {
+      localStorage.setItem('auth_token', authData.token);
+      localStorage.setItem('user', JSON.stringify(authData.user));
+      setUser(authData.user);
+      setToken(authData.token);
     }
   };
 

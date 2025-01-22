@@ -1,4 +1,4 @@
-// src/pages/AuthCallback.tsx
+// Update AuthCallback.tsx
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -16,18 +16,18 @@ const AuthCallback = () => {
       try {
         const user = JSON.parse(userStr);
         setAuth({ token, user });
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       } catch (error) {
         console.error('Error parsing user data:', error);
-        navigate('/login');
+        navigate('/login', { replace: true });
       }
     } else {
-      navigate('/login');
+      navigate('/login', { replace: true });
     }
   }, [searchParams, setAuth, navigate]);
 
   return (
-    <div className="auth-callback">
+    <div className="loading-container">
       <div className="loading-spinner">Loading...</div>
     </div>
   );

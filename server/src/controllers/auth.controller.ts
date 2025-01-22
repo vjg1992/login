@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { query } from '../config/db';
 import { generateToken } from '../utils/jwt';
 import { sendSMS } from '../services/sns.service';
+import nodemailer from 'nodemailer';
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -72,48 +73,54 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSKEY
+  },
+});
+
+async function sendEmailOTP(email: string, otp: string) {
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Login OTP',
+      text: `Your OTP for login is: ${otp}`
+    });
+    console.log('Email sent successfully');
+  } catch (error) {
+    console.error('Email send error:', error);
+    throw error;
+  }
+}
+
+
 export const sendOTP = async (req: Request, res: Response) => {
   try {
     const { type, value } = req.body;
-
-    // Validate input
-    if (!type || !value) {
-      return res.status(400).json({
-        success: false,
-        error: 'Type and value are required'
-      });
-    }
-
-    // Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    // Save OTP
-    const insertQuery = `
-      INSERT INTO otps (user_id, otp_code, otp_type, expires_at)
-      SELECT id, $1, $2, $3
-      FROM users
-      WHERE ${type === 'email' ? 'email' : 'mobile'} = $4
-    `;
-
-    await query(insertQuery, [otp, type, expiresAt, value]);
-
-    // In production, send actual OTP via email/SMS
-    console.log(`OTP for testing: ${otp}`);
-
-    if (type === 'mobile') {
-      // Send SMS
-      await sendSMS(value, `Your OTP for login is: ${otp}`);
-    } else {
-      // For email, just log it (implement email sending later)
-      console.log(`OTP for testing: ${otp}`);
+    if (type === 'email') {
+      await sendEmailOTP(value, otp);
+    } else if (type === 'mobile') {
+      await sendSMS(value, `Your OTP is: ${otp}`);
     }
+
+    await query(
+      `INSERT INTO otps (user_id, otp_code, otp_type, expires_at)
+       SELECT id, $1, $2, $3
+       FROM users
+       WHERE ${type === 'email' ? 'email' : 'mobile'} = $4`,
+      [otp, type, expiresAt, value]
+    );
 
     return res.status(200).json({
       success: true,
-      message: `OTP sent successfully to ${type}`
+      message: `OTP sent successfully to ${value}`
     });
-
   } catch (error) {
     console.error('Send OTP error:', error);
     return res.status(500).json({
@@ -126,30 +133,23 @@ export const sendOTP = async (req: Request, res: Response) => {
 export const verifyOTP = async (req: Request, res: Response) => {
   try {
     const { type, value, otp } = req.body;
+    console.log('Verifying OTP:', { type, value, otp });
 
-    // Validate input
-    if (!type || !value || !otp) {
-      return res.status(400).json({
-        success: false,
-        error: 'Type, value and OTP are required'
-      });
-    }
+    const result = await query(
+      `SELECT o.*, u.id as user_id
+       FROM otps o
+       JOIN users u ON u.id = o.user_id
+       WHERE o.otp_code = $1
+       AND o.otp_type = $2
+       AND u.${type === 'email' ? 'email' : 'mobile'} = $3
+       AND o.expires_at > CURRENT_TIMESTAMP
+       AND o.is_verified = false
+       ORDER BY o.created_at DESC
+       LIMIT 1`,
+      [otp, type, value]
+    );
 
-    // Verify OTP
-    const verifyQuery = `
-      SELECT o.*, u.id as user_id
-      FROM otps o
-      JOIN users u ON u.id = o.user_id
-      WHERE o.otp_code = $1
-      AND o.otp_type = $2
-      AND u.${type === 'email' ? 'email' : 'mobile'} = $3
-      AND o.expires_at > CURRENT_TIMESTAMP
-      AND o.is_verified = false
-      ORDER BY o.created_at DESC
-      LIMIT 1
-    `;
-
-    const result = await query(verifyQuery, [otp, type, value]);
+    console.log('Query result:', result.rows);
 
     if (result.rows.length === 0) {
       return res.status(401).json({
@@ -158,27 +158,31 @@ export const verifyOTP = async (req: Request, res: Response) => {
       });
     }
 
-    const otpRecord = result.rows[0];
-
     // Mark OTP as verified
     await query(
       'UPDATE otps SET is_verified = true WHERE id = $1',
-      [otpRecord.id]
+      [result.rows[0].id]
     );
 
-    // Generate token
-    const token = generateToken(otpRecord.user_id);
+    //verifyOTP function
+    const userDetails = await query(
+      'SELECT first_name, last_name, email FROM users WHERE id = $1',
+      [result.rows[0].user_id]
+    );
+
+    // Generate JWT
+    const token = generateToken(result.rows[0].user_id);
 
     return res.status(200).json({
       success: true,
-      data: { token }
+      data: { token },
+      user: userDetails.rows[0]
     });
-
   } catch (error) {
     console.error('Verify OTP error:', error);
     return res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: 'Failed to verify OTP'
     });
   }
 };
