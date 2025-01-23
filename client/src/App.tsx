@@ -4,18 +4,33 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'r
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CssBaseline } from '@mui/material';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AuthCallback from './pages/AuthCallback';
 
-// Types
+// Enhanced User interface to support registration fields
 interface User {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
   mobile: string;
+  age?: number;
+  location?: string;
+  address?: {
+    area: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
+  isEmailVerified?: boolean;
+  isMobileVerified?: boolean;
+  isGoogleAuth?: boolean;
+  createdAt?: string;
+  lastLogin?: string;
 }
 
+// Auth context interface remains the same but supports enhanced User type
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -34,7 +49,7 @@ export const useAuth = () => {
   return context;
 };
 
-// Auth Provider Component
+// Auth Provider Component with enhanced user support
 function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -83,7 +98,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Auth Service for OTP
+// Auth Service for OTP verification during registration and login
 export const authService = {
   async sendOTP(type: 'email' | 'mobile', value: string) {
     const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/send-otp`, {
@@ -92,11 +107,22 @@ export const authService = {
       body: JSON.stringify({ type, value })
     });
     return response.json();
+  },
+
+  async verifyOTP(type: 'email' | 'mobile', value: string, otp: string) {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, value, otp })
+    });
+    return response.json();
   }
 };
 
+// Initialize Query Client for data fetching
 const queryClient = new QueryClient();
 
+// Main App Component with all routes
 function App() {
   return (
     <Router>
@@ -105,6 +131,7 @@ function App() {
           <CssBaseline />
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/auth/success" element={<AuthCallback />} />
             <Route path="/auth/error" element={<Navigate to="/login" />} />
             <Route path="/dashboard" element={<Dashboard />} />
