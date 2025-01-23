@@ -157,24 +157,51 @@ async function sendEmailOTP(email: string, otp: string) {
 }
 
 
+// In auth.controller.ts
+
 export const sendOTP = async (req: Request, res: Response) => {
   try {
     const { type, value } = req.body;
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
+    // First, check if user exists
+    let userResult = await query(
+      `SELECT id FROM users WHERE ${type === 'email' ? 'email' : 'mobile'} = $1`,
+      [value]
+    );
+
+    let userId;
+    if (userResult.rows.length === 0) {
+      // Create new user with minimal information
+      const newUserResult = await query(
+        `INSERT INTO users (
+          ${type === 'email' ? 'email' : 'mobile'},
+          created_at
+        ) VALUES ($1, CURRENT_TIMESTAMP) RETURNING id`,
+        [value]
+      );
+      userId = newUserResult.rows[0].id;
+    } else {
+      userId = userResult.rows[0].id;
+    }
+
+    // Send OTP based on type
     if (type === 'email') {
       await sendEmailOTP(value, otp);
     } else if (type === 'mobile') {
       await sendSMS(value, `Your OTP is: ${otp}`);
     }
 
+    // Store OTP
     await query(
-      `INSERT INTO otps (user_id, otp_code, otp_type, expires_at)
-       SELECT id, $1, $2, $3
-       FROM users
-       WHERE ${type === 'email' ? 'email' : 'mobile'} = $4`,
-      [otp, type, expiresAt, value]
+      `INSERT INTO otps (
+        user_id,
+        otp_code,
+        otp_type,
+        expires_at
+      ) VALUES ($1, $2, $3, $4)`,
+      [userId, otp, type, expiresAt]
     );
 
     return res.status(200).json({
@@ -195,8 +222,9 @@ export const verifyOTP = async (req: Request, res: Response) => {
     const { type, value, otp } = req.body;
     console.log('Verifying OTP:', { type, value, otp });
 
+    // Modified query to handle new user structure
     const result = await query(
-      `SELECT o.*, u.id as user_id
+      `SELECT o.*, u.id as user_id, u.first_name, u.last_name, u.email, u.mobile
        FROM otps o
        JOIN users u ON u.id = o.user_id
        WHERE o.otp_code = $1
@@ -224,19 +252,32 @@ export const verifyOTP = async (req: Request, res: Response) => {
       [result.rows[0].id]
     );
 
-    //verifyOTP function
-    const userDetails = await query(
-      'SELECT first_name, last_name, email FROM users WHERE id = $1',
+    // Update user verification status
+    await query(
+      `UPDATE users 
+       SET ${type === 'email' ? 'is_email_verified' : 'is_mobile_verified'} = true 
+       WHERE id = $1`,
       [result.rows[0].user_id]
     );
 
     // Generate JWT
     const token = generateToken(result.rows[0].user_id);
 
+    // Return minimal user details
     return res.status(200).json({
       success: true,
-      data: { token },
-      user: userDetails.rows[0]
+      data: { 
+        token,
+        user: {
+          id: result.rows[0].user_id,
+          email: result.rows[0].email,
+          mobile: result.rows[0].mobile,
+          firstName: result.rows[0].first_name,
+          lastName: result.rows[0].last_name,
+          isEmailVerified: type === 'email' ? true : undefined,
+          isMobileVerified: type === 'mobile' ? true : undefined
+        }
+      }
     });
   } catch (error) {
     console.error('Verify OTP error:', error);
@@ -277,5 +318,198 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
       success: false,
       error: 'Failed to logout'
     }); return;
+  }
+};
+
+
+export const sendRegistrationOTP = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { type, value } = req.body;
+    
+    // First check if user already exists
+    const existingUser = await query(
+      `SELECT id FROM users WHERE ${type === 'email' ? 'email' : 'mobile'} = $1`,
+      [value]
+    );
+
+    if (existingUser.rows.length > 0) {
+      res.status(400).json({
+        success: false,
+        error: `User with this ${type} already exists`
+      });return;
+    };
+
+     // Delete any existing OTPs for this identifier
+     await query(
+      'DELETE FROM registration_otps WHERE identifier = $1 AND identifier_type = $2',
+      [value, type]
+    );
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    // Send OTP via email or SMS
+    if (type === 'email') {
+      await sendEmailOTP(value, otp);
+    } else if (type === 'mobile') {
+      await sendSMS(value, `Your OTP is: ${otp}`);
+      console.log('SMS sent successfully from sendRegistrationOTP to mobile:', value);
+    }
+
+    // Store OTP in registration_otps table
+    await query(
+      `INSERT INTO registration_otps (
+        identifier, 
+        identifier_type, 
+        otp_code, 
+        expires_at
+      ) VALUES ($1, $2, $3, $4)`,
+      [value, type, otp, expiresAt]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `OTP sent successfully to ${value}`
+    });return;
+  } catch (error) {
+    console.error('Send registration OTP error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send OTP'
+    });return;
+  }
+};
+
+export const verifyRegistrationOTP = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { type, value, otp } = req.body;
+
+    const result = await query(
+      `SELECT * FROM registration_otps 
+       WHERE identifier = $1 
+       AND identifier_type = $2 
+       AND otp_code = $3
+       AND expires_at > CURRENT_TIMESTAMP
+       AND is_verified = false
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [value, type, otp]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(401).json({
+        success: false,
+        error: 'Invalid or expired OTP'
+      });return;
+    }
+
+    // Mark OTP as verified
+    await query(
+      'UPDATE registration_otps SET is_verified = true WHERE id = $1',
+      [result.rows[0].id]
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        verified: true,
+        type,
+        value
+      }
+    });return;
+  } catch (error) {
+    console.error('Verify registration OTP error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to verify OTP'
+    });return;
+  }
+};
+
+// Modify the register endpoint to verify both email and mobile are verified
+export const register = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { firstName, lastName, email, mobile, age, location, address } = req.body;
+
+    // Check if both email and mobile are verified
+    const verifiedEmail = await query(
+      `SELECT * FROM registration_otps 
+       WHERE identifier = $1 
+       AND identifier_type = 'email' 
+       AND is_verified = true
+       AND expires_at > CURRENT_TIMESTAMP`,
+      [email]
+    );
+
+    const verifiedMobile = await query(
+      `SELECT * FROM registration_otps 
+       WHERE identifier = $1 
+       AND identifier_type = 'mobile' 
+       AND is_verified = true
+       AND expires_at > CURRENT_TIMESTAMP`,
+      [mobile]
+    );
+
+    if (verifiedEmail.rows.length === 0 || verifiedMobile.rows.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Both email and mobile must be verified before registration, please try again!'
+      });return;
+    }
+
+    // Proceed with user creation
+    const result = await query(
+      `INSERT INTO users (
+        first_name, 
+        last_name, 
+        email, 
+        mobile, 
+        age,
+        location,
+        address_area,
+        address_city,
+        address_state,
+        address_pincode,
+        is_email_verified,
+        is_mobile_verified,
+        created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, true, CURRENT_TIMESTAMP)
+      RETURNING id, first_name, last_name, email, mobile`,
+      [
+        firstName,
+        lastName,
+        email,
+        mobile,
+        age,
+        location,
+        address.area,
+        address.city,
+        address.state,
+        address.pincode
+      ]
+    );
+
+    // Generate token
+    const token = generateToken(result.rows[0].id);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        token,
+        user: {
+          id: result.rows[0].id,
+          firstName: result.rows[0].first_name,
+          lastName: result.rows[0].last_name,
+          email: result.rows[0].email,
+          mobile: result.rows[0].mobile
+        }
+      }
+    });return;
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to register user'
+    });return;
   }
 };

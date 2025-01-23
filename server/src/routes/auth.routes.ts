@@ -6,6 +6,7 @@ import * as googleController from '../controllers/google.controller';
 import * as googleAuthController from '../controllers/google.auth.controller';
 import { authenticateToken } from '../middleware/auth';
 
+
 const router = Router();
 
 // Basic authentication routes
@@ -13,6 +14,11 @@ router.post('/login', authController.login as (req: Request, res: Response) => v
 router.post('/send-otp', authController.sendOTP as (req: Request, res: Response) => void);
 router.post('/verify-otp', authController.verifyOTP as (req: Request, res: Response) => void);
 router.post('/logout', authenticateToken, authController.logout);
+
+// Add new routes for registration OTP
+router.post('/register/send-otp', authController.sendRegistrationOTP);
+router.post('/register/verify-otp', authController.verifyRegistrationOTP);
+router.post('/register', validateRegistration, authController.register);
 
 // Google OAuth routes
 router.get('/google', (req, res) => googleAuthController.googleLogin(req, res));

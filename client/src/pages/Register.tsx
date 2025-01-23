@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import './Register.css';
 
-// Simple interface for form data
 interface RegisterFormData {
   firstName: string;
   lastName: string;
@@ -25,7 +24,6 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
   const [formData, setFormData] = useState<RegisterFormData>({
     firstName: '',
     lastName: '',
@@ -41,13 +39,11 @@ const Register = () => {
     }
   });
 
-  // Verification states
   const [emailOTP, setEmailOTP] = useState('');
   const [mobileOTP, setMobileOTP] = useState('');
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [isMobileVerified, setIsMobileVerified] = useState(false);
 
-  // Handle basic input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -56,7 +52,6 @@ const Register = () => {
     }));
   };
 
-  // Handle address changes
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -68,11 +63,11 @@ const Register = () => {
     }));
   };
 
-  // Handle sending OTP
   const sendOTP = async (type: 'email' | 'mobile') => {
     try {
+      setError(null);
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/send-otp`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -81,7 +76,10 @@ const Register = () => {
         })
       });
       
-      if (!response.ok) throw new Error('Failed to send OTP');
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send OTP');
+      }
       
       alert(`OTP sent to your ${type}`);
     } catch (err) {
@@ -91,12 +89,12 @@ const Register = () => {
     }
   };
 
-  // Handle verifying OTP
   const verifyOTP = async (type: 'email' | 'mobile') => {
     try {
+      setError(null);
       setLoading(true);
       const otp = type === 'email' ? emailOTP : mobileOTP;
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify-otp`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -106,10 +104,18 @@ const Register = () => {
         })
       });
 
-      if (!response.ok) throw new Error('Invalid OTP');
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid OTP');
+      }
 
-      if (type === 'email') setIsEmailVerified(true);
-      else setIsMobileVerified(true);
+      if (type === 'email') {
+        setIsEmailVerified(true);
+        setEmailOTP('');
+      } else {
+        setIsMobileVerified(true);
+        setMobileOTP('');
+      }
       
       alert(`${type} verified successfully!`);
     } catch (err) {
@@ -119,7 +125,6 @@ const Register = () => {
     }
   };
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -129,6 +134,7 @@ const Register = () => {
     }
 
     try {
+      setError(null);
       setLoading(true);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register`, {
         method: 'POST',
@@ -137,10 +143,10 @@ const Register = () => {
       });
 
       const data = await response.json();
-      
-      if (!response.ok) throw new Error(data.error);
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
 
-      // Set authentication and redirect
       setAuth(data.data);
       navigate('/dashboard');
     } catch (err) {
@@ -150,13 +156,21 @@ const Register = () => {
     }
   };
 
+  // Indian states array for the dropdown
+  const indianStates = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", 
+    "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", 
+    "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", 
+    "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", 
+    "Uttar Pradesh", "Uttarakhand", "West Bengal"
+  ];
+
   return (
     <div className="register-container">
       <form onSubmit={handleSubmit} className="register-form">
         <h2>Create Account</h2>
         {error && <div className="error-message">{error}</div>}
 
-        {/* Basic Information */}
         <div className="form-group">
           <input
             type="text"
@@ -179,7 +193,6 @@ const Register = () => {
           />
         </div>
 
-        {/* Email Verification */}
         <div className="form-group">
           <input
             type="email"
@@ -191,7 +204,11 @@ const Register = () => {
             disabled={isEmailVerified}
           />
           {!isEmailVerified && (
-            <button type="button" onClick={() => sendOTP('email')} disabled={loading}>
+            <button 
+              type="button" 
+              onClick={() => sendOTP('email')} 
+              disabled={loading || !formData.email}
+            >
               Send Email OTP
             </button>
           )}
@@ -203,14 +220,17 @@ const Register = () => {
                 onChange={(e) => setEmailOTP(e.target.value)}
                 placeholder="Enter Email OTP"
               />
-              <button type="button" onClick={() => verifyOTP('email')} disabled={loading}>
+              <button 
+                type="button" 
+                onClick={() => verifyOTP('email')} 
+                disabled={loading || !emailOTP}
+              >
                 Verify Email
               </button>
             </div>
           )}
         </div>
 
-        {/* Mobile Verification */}
         <div className="form-group">
           <input
             type="tel"
@@ -222,7 +242,11 @@ const Register = () => {
             disabled={isMobileVerified}
           />
           {!isMobileVerified && (
-            <button type="button" onClick={() => sendOTP('mobile')} disabled={loading}>
+            <button 
+              type="button" 
+              onClick={() => sendOTP('mobile')} 
+              disabled={loading || !formData.mobile}
+            >
               Send Mobile OTP
             </button>
           )}
@@ -234,14 +258,17 @@ const Register = () => {
                 onChange={(e) => setMobileOTP(e.target.value)}
                 placeholder="Enter Mobile OTP"
               />
-              <button type="button" onClick={() => verifyOTP('mobile')} disabled={loading}>
+              <button 
+                type="button" 
+                onClick={() => verifyOTP('mobile')} 
+                disabled={loading || !mobileOTP}
+              >
                 Verify Mobile
               </button>
             </div>
           )}
         </div>
 
-        {/* Age Selection */}
         <div className="form-group">
           <input
             type="range"
@@ -254,7 +281,6 @@ const Register = () => {
           <span>Age: {formData.age}</span>
         </div>
 
-        {/* Location and Address */}
         <div className="form-group">
           <input
             type="text"
@@ -283,9 +309,16 @@ const Register = () => {
             placeholder="City"
             required
           />
-          <select name="state" value={formData.address.state} onChange={handleAddressChange} required>
+          <select 
+            name="state" 
+            value={formData.address.state} 
+            onChange={handleAddressChange} 
+            required
+          >
             <option value="">Select State</option>
-            {/* Add Indian states here */}
+            {indianStates.map(state => (
+              <option key={state} value={state}>{state}</option>
+            ))}
           </select>
           <input
             type="text"
@@ -298,7 +331,10 @@ const Register = () => {
           />
         </div>
 
-        <button type="submit" disabled={loading || !isEmailVerified || !isMobileVerified}>
+        <button 
+          type="submit" 
+          disabled={loading || !isEmailVerified || !isMobileVerified}
+        >
           {loading ? 'Creating Account...' : 'Create Account'}
         </button>
       </form>

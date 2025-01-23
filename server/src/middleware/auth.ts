@@ -43,25 +43,49 @@ export const validateRegistration = (
   res: Response,
   next: NextFunction
 ) : void => {
-  const { firstName, lastName, email, mobile } = req.body;
+  const { 
+    firstName, 
+    lastName, 
+    email, 
+    mobile,
+    age,
+    location,
+    address
+  } = req.body;
 
+  // Check required fields
   if (!firstName || !lastName || !email || !mobile) {
-    res.status(400).json({ error: 'All fields are required' });
+    res.status(400).json({ error: 'Required fields are missing' });
     return;
   }
 
-  // Basic email validation
+  // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     res.status(400).json({ error: 'Invalid email format' });
     return;
   }
 
-  // Basic mobile validation (10 digits)
-  const mobileRegex = /^\d{10}$/;
+  // Validate mobile number (assuming Indian format)
+  const mobileRegex = /^[6-9]\d{9}$/;
   if (!mobileRegex.test(mobile)) {
     res.status(400).json({ error: 'Invalid mobile number format' });
     return;
+  }
+
+  // Validate age
+  if (age && (age < 18 || age > 100)) {
+    res.status(400).json({ error: 'Age must be between 18 and 100' });
+    return;
+  }
+
+  // Validate address if provided
+  if (address) {
+    const { pincode } = address;
+    if (pincode && !/^\d{6}$/.test(pincode)) {
+      res.status(400).json({ error: 'Invalid pincode format' });
+      return;
+    }
   }
 
   next();
