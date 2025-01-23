@@ -1,9 +1,7 @@
-// src/pages/Login.tsx
+// Login.tsx
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { authService } from '../services/auth.service';
-import { ApiError } from '../types/auth.types';
+import { useAuth, authService } from '../App';
 import './Login.css';
 import GoogleButton from '@/components/GoogleButton';
 
@@ -39,21 +37,39 @@ const Login = () => {
     setActiveTab(tab);
     resetOTPForm();
   };
+  
+
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
+  
     try {
-      const response = await authService.login({
-        emailOrMobile: passwordForm.emailOrMobile,
-        password: passwordForm.password
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emailOrMobile: passwordForm.emailOrMobile,
+          password: passwordForm.password
+        })
       });
-      setAuth(response);
+  
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to login');
+      }
+  
+      // Updated to use data.data to match OTP flow
+      setAuth(data.data);
+      
+      // Store token using the same structure
+      localStorage.setItem('auth_token', data.data.token);
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+      
       navigate('/dashboard');
     } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.response?.data?.error || 'Failed to login');
+      setError(err instanceof Error ? err.message : 'Failed to login');
     } finally {
       setLoading(false);
     }
@@ -67,9 +83,8 @@ const Login = () => {
       const type = activeTab === 'emailOtp' ? 'email' : 'mobile';
       await authService.sendOTP(type, otpForm.emailOrMobile);
       setOtpForm(prev => ({ ...prev, otpSent: true }));
-    } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.response?.data?.error || 'Failed to send OTP');
+    } catch {
+      setError('Failed to send OTP');
     } finally {
       setLoading(false);
     }
@@ -91,16 +106,13 @@ const Login = () => {
   
       const data = await response.json();
       if (!data) {
-        setError(data.error || 'Verification failed');
-        console.error('Failed to verify OTP:', data.error);
-      } else {
-        setAuth(data.data);
-        //setAuth(response);
-        console.log('OTP verified successfully');
-        navigate('/dashboard');
-        //window.location.href = '/dashboard';
+        throw new Error('Verification failed');
       }
+
+      setAuth(data.data);
+      navigate('/dashboard');
     } catch (error) {
+      setError('Failed to verify OTP');
       console.error('Failed to verify OTP:', error);
     } finally {
       setLoading(false);
@@ -254,11 +266,9 @@ const Login = () => {
               )}
             </form>
           )}
-          {/* Google Login Button */}
+          
           <div className="divider">OR</div>
-
           <GoogleButton />
-
           <p className="register-link">
             Don't have an account? <Link to="/register">Register here</Link>
           </p>

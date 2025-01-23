@@ -10,11 +10,12 @@ router.get('/test', (req, res) => {
     res.json({ message: 'Users route is working' });
 });
 
+// Get current user's profile (protected route)
+router.get('/me', authenticateToken, usersController.getUserDetails);
+
+
 // Get all users (protected route)
 router.get('/', authenticateToken, usersController.getAllUsers as any);
-
-// Get current user's profile (protected route)
-router.get('/profile', authenticateToken, usersController.getUserDetails);
 
 // Get user by ID (protected route)
 router.get('/:id', authenticateToken, usersController.getUserById as any);

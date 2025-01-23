@@ -4,7 +4,6 @@ import { query } from '../config/db';
 
 export const getUserDetails = async (req: Request, res: Response): Promise<void>  => {
   try {
-    console.log('req.userId:', req.userId);
     // req.userId comes from auth middleware
     const result = await query(
       `SELECT 

@@ -1,20 +1,68 @@
-// src/pages/Dashboard.tsx
-import { useEffect } from 'react';
+// Dashboard.tsx
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { useUserData } from '../hooks/useAuth';
+import { useAuth } from '../App';
 import './Dashboard.css';
+
+interface UserData {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  mobile: string | null;
+  created_at: string;
+  last_login: string | null;
+  is_email_verified: boolean;
+  is_mobile_verified: boolean;
+  is_google_auth: boolean;
+}
 
 const Dashboard = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const { userData, loading, error } = useUserData();
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (error) {
-      navigate('/login');
+    const fetchUserData = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('http://localhost:5000/api/users/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
+          console.log(error);
+        }
+
+        const data = await response.json();
+        if (data.success) {
+          setUserData(data.data);
+        }
+      } catch (err) {
+        setError((err as Error).message);
+        setError('Failed to send OTP');
+        navigate('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout failed:', error);
     }
-  }, [error, navigate]);
+  };
 
   if (loading) {
     return (
@@ -29,7 +77,7 @@ const Dashboard = () => {
     <div className="dashboard">
       <header className="dashboard-header">
         <h1>Welcome, {userData?.first_name || 'User'}!</h1>
-        <button onClick={logout} className="logout-button">
+        <button onClick={handleLogout} className="logout-button">
           Logout
         </button>
       </header>

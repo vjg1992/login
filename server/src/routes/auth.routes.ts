@@ -4,6 +4,7 @@ import { validateRegistration } from '../middleware/auth';
 import * as authController from '../controllers/auth.controller';
 import * as googleController from '../controllers/google.controller';
 import * as googleAuthController from '../controllers/google.auth.controller';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
@@ -11,6 +12,7 @@ const router = Router();
 router.post('/login', authController.login as (req: Request, res: Response) => void);
 router.post('/send-otp', authController.sendOTP as (req: Request, res: Response) => void);
 router.post('/verify-otp', authController.verifyOTP as (req: Request, res: Response) => void);
+router.post('/logout', authenticateToken, authController.logout);
 
 // Google OAuth routes
 router.get('/google', (req, res) => googleAuthController.googleLogin(req, res));
